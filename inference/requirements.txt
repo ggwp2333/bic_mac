@@ -1,0 +1,6 @@
+# Pinned to the versions the pipeline was validated against on the shared
+# machine, so the container is not a different numerical environment.
+# torch/torchvision come from the base image and are deliberately absent here.
+monai==1.5.2
+nibabel==5.4.2
+numpy==2.4.4

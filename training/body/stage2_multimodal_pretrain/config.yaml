@@ -1,0 +1,71 @@
+experiment: pretrain_v2_multimodal_supervised
+
+# Corpus written by prepare_corpus.py: the stage-1 171 scans, described in the
+# model's own 4-channel input space.
+corpus: corpus.json
+train_datasets: [BIC-MAC, QUADRA_HC]
+
+# ---------------------------------------------------------------- model
+# Identical to finetune_v1 so the whole network transfers — including the stem,
+# which stage 1 could not carry because it read 1 channel and the downstream
+# model reads 4.
+base_channels: 96
+in_channels: 4
+
+# Stage-1 weights. `pretrain_v1/outputs_pretrain/pretrained_init.pth` is already
+# a 4-channel width-96 state dict (its stem was freshly initialised on export),
+# so it loads here with strict=True. Set to null to train stage 2 from scratch,
+# which is a different and untested experiment.
+init_checkpoint: ../stage1_ct_pretrain/outputs_pretrain/pretrained_init.pth
+# Or start from the released stage-1 weights:
+# init_checkpoint: ../../../weights/body_stage1_ct_pretrain.pth
+
+# ---------------------------------------------------------------- augmentation
+# Modality dropout is the load-bearing idea of this stage, not a detail — see
+# transforms.py. `dropout_prob` is the chance a sample is touched at all;
+# `per_channel_prob` is the chance each available channel is then zeroed. At
+# least one available channel always survives.
+modality_dropout:
+  prob: 0.5
+  per_channel_prob: 0.25
+
+# Cutout-style block masking of the input. In stage 1 this WAS the pretext task
+# at ratio 0.5; here the task is real prediction and this is augmentation, hence
+# the much lower ratio. Set to 0.0 to disable.
+mask_ratio: 0.25
+block_size: 16
+
+# ---------------------------------------------------------------- optimisation
+# Shorter than stage 1: this starts from trained weights and the corpus is
+# supervised, so it converges faster and has more room to overfit. The stage-1
+# arm was still improving at 200 but its generalization gap was +14-18%.
+epochs: 120
+learning_rate: 0.0002
+batch_size: 1
+grad_accum_steps: 1
+patch_size: [144, 144, 144]
+train_num_samples: 4
+num_workers: 4
+cache_rate: 0.0
+output_dir: outputs
+
+# Same mu-space tissue-weighted objective as the downstream run, scored inside
+# prediction_mask where BIC-MAC provides one and the body mask for QUADRA.
+umap_loss_weight: 1.0
+ct_loss_weight: 0.0
+tissue_loss:
+  enabled: true
+  blend: 0.5
+  lung_air_max_hu: -500
+  bone_min_hu: 300
+  lung_air_weight: 1.5
+  soft_tissue_weight: 1.0
+  bone_weight: 2.0
+  interface_multiplier: 1.5
+
+# ---------------------------------------------------------------- checkpoints
+checkpoint_every_epochs: 10
+keep_last_checkpoint: true
+validate_every_epochs: 2
+val_num_samples: 2
+val_seed: 1234

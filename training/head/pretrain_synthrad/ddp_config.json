@@ -1,0 +1,12 @@
+{
+  "run_dir": "runs/brain_pretrain_v1",
+  "epochs": 250,
+  "learning_rate": 0.0003,
+  "batch_size": 2,
+  "grad_accum_steps": 4,
+  "num_workers": 6,
+  "n_val_subjects": 8,
+  "samples_per_epoch": 420,
+  "aug_flip_x": true,
+  "cache_in_ram": true
+}

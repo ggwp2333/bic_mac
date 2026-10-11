@@ -1,0 +1,129 @@
+# finetune_v1 — the width-96 arms of the pretraining experiment (plan.md §3.12).
+#
+# This file is baseline_v7's recipe with exactly two knobs added: `base_channels`
+# and `init_checkpoint`. Everything else — data, patch size, loss, LR, schedule —
+# is left at v7's values on purpose, so that the only difference between this run
+# and the width-64 anchor is width, and the only difference between the two arms
+# of this experiment is the initialisation.
+#
+#   control     arm: init_checkpoint: null              <- this file as shipped
+#   pretrained  arm: init_checkpoint: <pretrained_init.pth>
+#
+# Do not change anything else between the two arms. §1.3.1 is the only clean
+# single-factor comparison this project has produced; this is how it was done.
+experiment: finetune_v1_width96
+arm: pretrained_stage2
+
+# Relative paths resolve from this directory. Set to wherever the BIC-MAC data lives.
+data_dir: ../../../data/bic-mac-data/train
+validation_data_dir: ../../../data/bic-mac-data/val
+expected_training_subjects: 75
+expected_validation_subjects: 4
+num_workers: 4
+output_dir: outputs_stage2
+cache_rate: 0.0
+
+input_keys:
+  - nacpet
+  - mri_combined_in_phase
+  - mri_combined_out_phase
+  - topogram
+
+# Width 96 = 206.3M parameters against baseline_v7's 64 = 91.7M. Inference cost
+# is 1.38x v7's, not 2.25x — measured at 26.8 s/subject vs 19.4 on an H100,
+# 12.5 GiB peak, roi 192, overlap 0.5. The A40 container budget (§3.6) has not
+# been measured for this width.
+base_channels: 96
+
+# Weights to start from, exported by pretrain_v1/export_encoder.py. `null` means
+# random init — the control arm. When set, training still starts at epoch 1: this
+# is an initialisation, not a resumption, so the LR schedule runs in full.
+init_checkpoint: ../stage2_multimodal_pretrain/outputs/stage2_init.pth
+# To fine-tune from the released stage-2 weights instead of re-running stage 2:
+# init_checkpoint: ../../../weights/body_stage2_multimodal_pretrain.pth
+
+epochs: 270
+learning_rate: 0.0003
+batch_size: 1
+grad_accum_steps: 1
+
+ct_loss_weight: 0.0
+umap_loss_weight: 1.0
+tissue_loss:
+  enabled: true
+  blend: 0.5
+  lung_air_max_hu: -500
+  bone_min_hu: 300
+  lung_air_weight: 1.5
+  soft_tissue_weight: 1.0
+  bone_weight: 2.0
+  interface_multiplier: 1.5
+
+patch_size: [192, 192, 192]
+train_num_samples: 4
+
+# Keep a permanent checkpoint every 5 epochs from 50 on. Separate from the
+# submission schedule below on purpose: disk is cheap, Codabench quota is not,
+# and §5.5 records that repeated probing over four validation subjects overfits.
+# 45 checkpoints x 825 MB ≈ 37 GB per arm.
+#
+# These exist so an early checkpoint *can* be scored later if the run turns out
+# to peak early — not so that the training-loss curve can pick one. In-sample
+# loss is not the selection signal: §5.3 measured a +7.6% generalization gap
+# that widens monotonically with epochs, so a low early training loss is as
+# consistent with faster overfitting as with faster convergence.
+#
+# Public release: the original run used start_epoch 50 and also saved every
+# leaderboard-submitted epoch (67, 72, ..., 152). With submission disabled,
+# start_epoch 52 keeps exactly those epochs, including the released epoch 92.
+checkpoint_schedule:
+  enabled: true
+  start_epoch: 52
+  every_epochs: 5
+
+# Submissions are triggered by the training loss, not by a fixed epoch. A fixed
+# start_epoch spends quota at the same epoch regardless of what the model is
+# doing, and these arms converge at very different rates: measured on the logs
+# already banked, `train_plain_mu` first holds below 0.006 for five consecutive
+# epochs at **epoch 239** for both baseline_v7 and the width-96 control, but at
+# **epoch 120** for the stage-1 pretrained arm. A stage-2 arm should trip it
+# earlier still.
+#
+# `start_epoch` and `every_epochs` below are IGNORED while trigger.enabled.
+#
+# Two consequences worth knowing:
+#  - The submitted epochs will differ between arms, so the paired-at-matched-
+#    epoch comparison that produced §3.12's 5/5, 4.7σ is not available against
+#    the banked arms unless the ranges happen to overlap. Compare run means
+#    (§1.3) instead, and note the trigger epoch itself is a result — an arm that
+#    trips it 100 epochs earlier has converged faster.
+#  - If the trigger fires late, the 18-submission span (85 epochs) can run past
+#    `epochs`. The trainer prints exactly how many will fit and what to raise
+#    `epochs` to.
+#
+# Public release: automatic Codabench submission is OFF (it needs the challenge
+# repo's submission.py and credentials). The original run had both flags true;
+# its trigger fired at epoch 67 and it stopped at epoch 152 after 18 submissions.
+# With the trigger off, nothing stops training early - stop it yourself.
+leaderboard_eval:
+  enabled: false
+  trigger:
+    enabled: false
+    metric: plain_mu            # the epoch-mean training μ-MAE, all-reduced
+    threshold: 0.006
+    consecutive_epochs: 5       # must hold below the threshold this many epochs
+    every_epochs: 5             # then submit on this cadence
+    max_submissions: 18
+    stop_after_last_submission: true   # nothing left to measure; stop early
+  start_epoch: 200
+  every_epochs: 5
+  competition_id: 12555
+  phase_id: null                 # null selects Codabench's current phase
+  wait_for_score: true
+  delete_after_score: true       # free Codabench quota after saving each score
+  dry_run: false                 # true validates packaging without uploading
+  max_submit_attempts: 3
+  retry_delay_seconds: 300
+  prediction_dir: leaderboard_predictions
+  zip_dir: leaderboard_zips
+  log_dir: leaderboard_logs

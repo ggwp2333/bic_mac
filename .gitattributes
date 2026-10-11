@@ -1,0 +1,2 @@
+# Checkpoints are 0.66-0.83 GB each, above GitHub's 100 MB file limit.
+weights/*.pth filter=lfs diff=lfs merge=lfs -text

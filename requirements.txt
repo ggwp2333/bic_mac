@@ -1,0 +1,12 @@
+# Training + figure environment (validated: Python 3.10, CUDA 12.1).
+# Install PyTorch for your CUDA first: https://pytorch.org/get-started/locally/
+torch==2.5.1
+monai==1.5.2
+nibabel==5.4.2
+numpy==1.26.4
+scipy==1.11.4
+pyyaml==6.0.3
+matplotlib==3.10.8
+tqdm==4.67.3
+# SimpleITK is needed only by training/head/pretrain_synthrad/build_cache.py (reads SynthRAD .mha)
+SimpleITK

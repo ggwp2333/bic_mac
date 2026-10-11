@@ -1,0 +1,67 @@
+experiment: pretrain_v1_ct_masked_reconstruction
+
+# Corpus manifest written by prepare_corpus.py. Everything about which scans are
+# used, how they are body-masked and how their bone HU is calibrated lives there.
+corpus: corpus.json
+train_datasets: [BIC-MAC, QUADRA_HC]
+
+# ---------------------------------------------------------------- model
+# 96 is 1.5x baseline_v7's width: 206.3M parameters against 91.7M, for a corpus
+# that grows 75 -> 171 scans. Depth is unchanged, so patch sizes must stay
+# multiples of 16.
+base_channels: 96
+in_channels: 1
+
+# ---------------------------------------------------------------- pretext task
+# Blank half the patch in 16-voxel cubes. 16 sits well inside the measured
+# effective receptive field (r90 = 49 voxels), so the removed blocks are
+# recoverable from context rather than guesswork.
+mask_ratio: 0.5
+block_size: 16
+noise_std: 0.0
+
+# Score only the voxels that were actually blanked. Including the visible
+# voxels lets the network win most of the loss by copying its input, which is
+# the classic way a masked-reconstruction pretext task learns nothing.
+loss_on_corrupted_only: true
+# Restrict the loss to the body. Air outside the patient is free to predict and
+# would otherwise dominate the average.
+loss_inside_body_only: true
+
+# ---------------------------------------------------------------- optimisation
+epochs: 200
+learning_rate: 0.0003
+batch_size: 1
+grad_accum_steps: 1
+patch_size: [144, 144, 144]
+train_num_samples: 4
+num_workers: 4
+cache_rate: 0.0
+# prepare_corpus.py reads this key too, so the derived body masks always land
+# where the trainer looks for them. If you change it, rerun prepare_corpus.py —
+# the manifest stores absolute mask paths.
+output_dir: outputs
+
+# Reconstruction is scored in mu at 511 keV with the same tissue weighting the
+# downstream run uses, so the pretext objective points at the same quantity the
+# challenge scores rather than at raw HU.
+umap_loss_weight: 1.0
+ct_loss_weight: 0.0
+tissue_loss:
+  enabled: true
+  blend: 0.5
+  lung_air_max_hu: -500
+  bone_min_hu: 300
+  lung_air_weight: 1.5
+  soft_tissue_weight: 1.0
+  bone_weight: 2.0
+  interface_multiplier: 1.5
+
+# ---------------------------------------------------------------- checkpoints
+checkpoint_every_epochs: 10
+keep_last_checkpoint: true
+# Held-out reconstruction loss, computed on the corpus's val split with a fixed
+# corruption seed so the curve is comparable epoch to epoch.
+validate_every_epochs: 2
+val_num_samples: 2
+val_seed: 1234

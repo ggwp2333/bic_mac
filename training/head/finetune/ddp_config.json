@@ -1,0 +1,30 @@
+{
+  "run_dir": "runs/head_finetune_v3",
+  "cache_dir": "../head_cache_bicmac",
+  "init_checkpoint": "../pretrain_synthrad/runs/brain_pretrain_v1/checkpoints/epoch_080.pth",
+  "epochs": 100,
+  "learning_rate": 0.0002,
+  "batch_size": 2,
+  "grad_accum_steps": 4,
+  "num_workers": 6,
+  "kl_warmup_epochs": 5,
+  "n_val_subjects": 0,
+  "monitor_subjects": 0,
+  "select_metric": "train_plain_mu",
+  "ckpt_every": 5,
+  "samples_per_epoch": 420,
+  "aug_flip_x": false,
+  "cache_in_ram": true,
+  "submission": {
+    "enabled": false,
+    "ct_only": true,
+    "start_epoch": 50,
+    "every_epochs": 10,
+    "max_submissions": 20,
+    "metric": "train_plain_mu",
+    "threshold": 0.006,
+    "consecutive_epochs": 5,
+    "gpu_ids": "",
+    "dry_run": false
+  }
+}

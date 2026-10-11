@@ -1,0 +1,4 @@
+head_epoch,body_epoch,codabench_submission_id,ct_mu_map_mae
+50,92,890137,0.0057306183
+70,92,890155,0.0057169486
+90,92,890207,0.0057183631

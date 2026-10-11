@@ -1,0 +1,7 @@
+# Build context is the repository root; the image needs only inference/ and
+# the two inference checkpoints.
+*
+!inference/
+!weights/body_finetune_e0092.pth
+!weights/head_finetune_e070.pth
+**/__pycache__
